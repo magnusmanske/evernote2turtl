@@ -1,0 +1,13 @@
+[package]
+name = "evernote2turtl"
+version = "0.1.0"
+authors = ["Magnus Manske <magnusmanske@googlemail.com>"]
+edition = "2018"
+
+[dependencies]
+regex = "1"
+lazy_static = "1.2.0"
+html2md = "0.2.5"
+json = "0.11.13"
+zip = "0.5.0"
+uuid = { version = "0.7", features = ["serde", "v4"] }

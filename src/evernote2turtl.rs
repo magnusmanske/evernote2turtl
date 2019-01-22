@@ -45,12 +45,19 @@ fn get_uuid() -> String {
 pub fn convert_html_file_contents_to_json(
     contents: std::string::String,
     user_id: u32,
-    _format: &str,
+    format: &str,
 ) -> Result<json::JsonValue, std::io::Error> {
     let html_start = contents.find("<body").unwrap();
     let html = contents.get(html_start..).unwrap();
     let title = extract_title(&contents)?;
     let md = html2md::parse_html(&html);
+    let mut md2 = md.trim_matches(|c| c == ' ' || c == '\n');
+    if format == "keep" && md2.contains("\n") {
+        // Remove first line in Keep format, as it just repeats the title
+        let second_line = md2.find("\n").unwrap();
+        md2 = md2.get((second_line + 1)..).unwrap();
+        md2 = md2.trim_matches(|c| c == ' ' || c == '\n');
+    }
     let j = object! {
         "id" => get_uuid(),
         "space_id" => get_dummy_turtl_space_id() ,
@@ -58,7 +65,7 @@ pub fn convert_html_file_contents_to_json(
         "has_file" => false ,
         "tags" => array![] ,
         "title" => title ,
-        "text" => md.trim_matches(|c|c==' '||c=='\n') ,
+        "text" => md2 ,
         "type" => "text"
     };
     Ok(j)

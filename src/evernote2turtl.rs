@@ -42,9 +42,10 @@ fn get_uuid() -> String {
     ret
 }
 
-pub fn convert_evernote_file_contents_to_json(
+pub fn convert_html_file_contents_to_json(
     contents: std::string::String,
     user_id: u32,
+    _format: &str,
 ) -> Result<json::JsonValue, std::io::Error> {
     let html_start = contents.find("<body").unwrap();
     let html = contents.get(html_start..).unwrap();
@@ -63,17 +64,30 @@ pub fn convert_evernote_file_contents_to_json(
     Ok(j)
 }
 
-pub fn convert_evernote_file_to_json(
+pub fn convert_file_to_json(
     file_name: &str,
     user_id: u32,
+    format: &str,
 ) -> Result<json::JsonValue, std::io::Error> {
     let mut f = File::open(file_name)?;
     let mut contents = String::new();
     f.read_to_string(&mut contents)?;
-    convert_evernote_file_contents_to_json(contents, user_id)
+    convert_html_file_contents_to_json(contents, user_id, format)
 }
 
-pub fn get_turtl_backup_object(user_id: u32) -> Result<json::JsonValue, std::io::Error> {
+pub fn get_turtl_backup_object(
+    user_id: u32,
+    format: &str,
+) -> Result<json::JsonValue, std::io::Error> {
+    let space_name;
+    let space_color;
+    if format == "evernote" {
+        space_name = "Evernote import";
+        space_color = "#000000";
+    } else {
+        space_name = "Google Keep import";
+        space_color = "#0000BB";
+    }
     let ret = object! {
         "body" => json::Null ,
         "boards" => array![],
@@ -82,13 +96,13 @@ pub fn get_turtl_backup_object(user_id: u32) -> Result<json::JsonValue, std::io:
         "schema_version" => 2 ,
         "spaces" => array![
             object!{
-                "color" => "#000000",
+                "color" => space_color,
                 "id" => get_dummy_turtl_space_id(),
                 "user_id" => user_id ,
                 "invites" => array![],
                 "keys" => array![],
                 "members" => array![],
-                "title" => "Evernote import",
+                "title" => space_name,
             }
         ]
     };
@@ -104,7 +118,7 @@ pub fn create_turtl_backup_from_zipfile(
         static ref re_hidden1: Regex = Regex::new(r"/\.").unwrap();
         static ref re_hidden2: Regex = Regex::new(r"^\.").unwrap();
     };
-    let mut ret = get_turtl_backup_object(user_id)?;
+    let mut ret = get_turtl_backup_object(user_id, "Evernote import")?;
     let f = File::open(zipfile)?;
     let mut zip = ZipArchive::new(f)?;
 
@@ -118,7 +132,7 @@ pub fn create_turtl_backup_from_zipfile(
         {
             let mut contents = String::new();
             file.read_to_string(&mut contents)?;
-            let note = convert_evernote_file_contents_to_json(contents, user_id)?;
+            let note = convert_html_file_contents_to_json(contents, user_id, "evernote")?; // Using evernote constant until this can process Keep ZIP files as well
             ret["notes"].push(note).unwrap();
         }
     }
@@ -128,18 +142,18 @@ pub fn create_turtl_backup_from_zipfile(
 pub fn create_turtl_backup_from_directory(
     path: &str,
     user_id: u32,
+    format: &str,
 ) -> Result<json::JsonValue, std::io::Error> {
     lazy_static::lazy_static! {
         static ref re: Regex = Regex::new(r"\.html$").unwrap();
     };
-    let mut ret = get_turtl_backup_object(user_id)?;
-
+    let mut ret = get_turtl_backup_object(user_id, format)?;
     if let Ok(entries) = fs::read_dir(path) {
         for entry in entries {
             if let Ok(entry) = entry {
                 let file_path = entry.path().to_string_lossy().into_owned();
                 if re.is_match(file_path.as_str()) {
-                    let note = convert_evernote_file_to_json(file_path.as_str(), user_id)?;
+                    let note = convert_file_to_json(file_path.as_str(), user_id, format)?;
                     ret["notes"].push(note).unwrap();
                 }
             }
